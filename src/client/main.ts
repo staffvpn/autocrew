@@ -2,6 +2,7 @@
 import { STAGES, TOOLS, TOOL, JOB, PART, PARTS, SUPPLIERS, SUPPLIER, ADS, PRICE_LEVELS, GRADES, PLATFORM_NAMES, NH_SECONDS, type Grade } from '../shared/content';
 import { BUILD } from '../shared/build';
 import { mskHour } from '../shared/time';
+import { LINES, voice } from '../shared/lines';
 import { draw, W, H } from './scene';
 
 declare global { interface Window { Telegram?: { WebApp: any } } }
@@ -12,6 +13,10 @@ type Any = any;
 let S: Any = null;            // последнее состояние с сервера
 let skew = 0;                 // разница часов сервера и клиента
 let tab = localStorage.getItem('ac_tab') || 'yard';
+const pref = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+const setPref = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* приватный режим */ } };
+let strong = pref('ac_strong') !== '0';
+const say = (text: string) => voice(text, strong);
 let pending = 0;              // сколько команд ещё в пути (нельзя перезагружать игру)
 let release: Any = null;
 let dismissedBuild = '';
@@ -148,10 +153,11 @@ let canvas: HTMLCanvasElement | null = null;
 function render() {
   const app = $('#app');
   if (!initData) { app.innerHTML = noTelegram(); bindNoTelegram(); return; }
+  if (pref('ac_age18') !== '1') { ageGate(app); return; }
   if (!S) { renderStart(app); return; }
   const c = S.company;
   if (!$('.top', app)) {
-    app.innerHTML = `<div class="top"></div><div class="scene"><canvas width="${W}" height="${H}"></canvas><div class="sign"></div><div class="clock"></div></div><main></main><nav class="tabs"></nav>`;
+    app.innerHTML = `<div class="top"></div><div class="scene"><canvas width="${W}" height="${H}"></canvas><div class="sign"></div><div class="clock"></div><div class="bubble" hidden></div></div><main></main><nav class="tabs"></nav>`;
     canvas = $('canvas', app) as HTMLCanvasElement;
     $('nav.tabs', app).onclick = e => {
       const b = (e.target as HTMLElement).closest('button') as HTMLElement | null;
@@ -180,6 +186,15 @@ function bindNoTelegram() {
   fetch('/api/dev-login?id=' + (localStorage.getItem('ac_dev_id') || '1')).then(r => r.ok ? r.json() : null).then(d => {
     if (d?.initData) { initData = d.initData; refresh(); }
   }).catch(() => {});
+}
+
+function ageGate(app: HTMLElement) {
+  app.innerHTML = `<div class="start"><h1>AUTO CREW</h1>
+    <div class="card"><h3>Только для взрослых</h3><p>В гаражах разговаривают по-гаражному: грубый юмор и крепкие выражения. Их можно выключить в настройках.</p>
+    <p class="small muted" style="margin-bottom:0">Продолжая, ты подтверждаешь, что тебе есть 18 лет.</p></div>
+    <button class="btn primary block" id="age18">Мне есть 18</button><button class="btn block" id="age17" style="margin-top:8px">Мне нет 18</button></div>`;
+  $('#age18').onclick = () => { setPref('ac_age18', '1'); render(); };
+  $('#age17').onclick = () => { $('.start').innerHTML = '<h1>AUTO CREW</h1><p>Тогда до встречи через пару лет. Гараж подождёт.</p>'; };
 }
 
 function renderStart(app: HTMLElement) {
@@ -348,12 +363,13 @@ function bizTab() {
     ${nextCard}
     <div class="sect">Реклама</div><div class="card">${ad}${ads}</div>
     <div class="sect">Движение кассы за последние дни</div><div class="card" style="overflow-x:auto">${fin}</div>
+    <div class="sect">Настройки</div><div class="card"><label class="check"><input type="checkbox" data-strong ${strong ? 'checked' : ''}> Крепкие выражения (18+)</label><div class="small muted">Если выключить, мужики в гараже будут говорить «ёлки-палки».</div></div>
     <p class="small muted" style="text-align:center">AUTO CREW ${esc(BUILD.version)} · <a href="#" data-news style="color:inherit">что нового</a></p>`;
 }
 
 function logTab() {
   if (!S.feed.length) return '<div class="empty">Пока ничего не произошло.</div>';
-  return `<div class="card"><ul class="list feed">${S.feed.map((f: Any) => `<li class="${esc(f.kind)}"><time>${clock(f.at)}</time>${esc(f.text)}</li>`).join('')}</ul></div>`;
+  return `<div class="card"><ul class="list feed">${S.feed.map((f: Any) => `<li class="${esc(f.kind)}"><time>${clock(f.at)}</time>${esc(say(f.text))}</li>`).join('')}</ul></div>`;
 }
 
 // ---------- Обработчики ----------
@@ -410,6 +426,7 @@ async function onMainClick(e: Event) {
 function onMainChange(e: Event) {
   const t = e.target as HTMLInputElement;
   if (t.dataset.extra) { quoteDraft.get(t.dataset.extra)!.extra = t.checked; render(); }
+  if (t.dataset.strong !== undefined) { strong = t.checked; setPref('ac_strong', strong ? '1' : '0'); render(); }
 }
 
 // ---------- Анимация и таймеры ----------
@@ -431,6 +448,13 @@ function frame(ts: number) {
       if (left) left.textContent = 'Осталось ' + mins(w.done_at - now());
       // Как только ремонт закончился по часам, спрашиваем сервер о результате
       if (now() > w.done_at + 500 && lastDone !== w.done_at) { lastDone = w.done_at; refresh(); }
+    }
+    // Владелец бурчит за работой: новая фраза каждые 9 секунд, 6 секунд на экране
+    const bubble = $('.scene .bubble');
+    if (bubble) {
+      const k = Math.floor(ts / 9000), show = w && ts % 9000 < 6000;
+      if (show && bubble.dataset.k !== String(k)) { bubble.dataset.k = String(k); bubble.textContent = say(LINES.mutter[(k * 7 + w.id.length) % LINES.mutter.length]); }
+      bubble.hidden = !show;
     }
   }
   requestAnimationFrame(frame);

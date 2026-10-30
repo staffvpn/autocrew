@@ -54,7 +54,7 @@ export async function handleTelegram(req: Request, env: Env, path: string): Prom
   const chat = msg.chat.id, from = msg.from?.id, text = String(msg.text).trim();
   if (text.startsWith('/start')) {
     await tgApi(env, 'sendMessage', { chat_id: chat,
-      text: 'AUTO CREW — автомобильный бизнес с нуля. Старый гараж, 60 000 ₽ и ни одного клиента. Дальше всё зависит от тебя.',
+      text: 'AUTO CREW — автомобильный бизнес с нуля. Старый гараж, 60 000 ₽ и ни одного клиента. Дальше всё зависит от тебя. 18+',
       reply_markup: { inline_keyboard: [[{ text: 'Открыть гараж', web_app: { url: appUrl(env, origin) } }]] } });
   } else if (text === '/admin' && admins.includes(from)) {
     const st = await env.DB.batch([

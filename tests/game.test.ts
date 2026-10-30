@@ -167,3 +167,23 @@ describe('админы', async () => {
     expect(adminIds({})).toEqual([]);
   });
 });
+
+describe('реплики', async () => {
+  const { LINES, voice, line } = await import('../src/shared/lines');
+  const { rng } = await import('../src/shared/rng');
+  const all = Object.values(LINES).flat();
+  it('у каждой вставки есть жёсткий и мягкий вариант', () => {
+    for (const s of all) for (const m of s.matchAll(/\{([^{}]*)\}/g)) if (/[а-яё]/i.test(m[1])) expect(m[1].split('|').length, s).toBe(2);
+  });
+  it('в мягком режиме не остаётся мата', () => {
+    const bad = /(бля|ёб|еб[аы]|хрен|хер|сук[аи]|пизд|нахрен|охрен)/i;
+    for (const s of all) expect(voice(s, false), s).not.toMatch(bad);
+  });
+  it('все подстановки заполняются', () => {
+    const vars = { name: 'Иван', car: 'Ладья', symptom: 'Стучит', sum: '1 ₽', tool: 'Ключ', supplier: 'Опт', mins: 5, n: 1 };
+    for (const key of Object.keys(LINES)) for (let i = 0; i < 20; i++) {
+      const text = voice(line(key, rng(key + i), vars), true);
+      expect(text, text).not.toMatch(/[{}|]/);
+    }
+  });
+});

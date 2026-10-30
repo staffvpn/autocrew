@@ -8,6 +8,7 @@ import {
   type Grade, type Platform,
 } from '../shared/content';
 import { rng } from '../shared/rng';
+import { line } from '../shared/lines';
 import { mskDay, mskHour, nextMidnight, DAY_MS } from '../shared/time';
 
 export interface Company {
@@ -153,7 +154,7 @@ function arrival(w: World, at: number) {
     price_level: null, grade: null, labor: 0, parts_price: 0, parts_cost: 0, started_at: 0, done_at: 0, complaint_at: 0, complaint_done: 0,
   };
   touchJob(w, job);
-  feed(w, at, 'customer', `Приехал ${job.customer} на ${modelName(job.car.model)}: «${job.symptom}»`);
+  feed(w, at, 'customer', line('arrival', r, { name: job.customer, car: modelName(job.car.model), symptom: job.symptom }));
 }
 
 export const modelName = (id: string) => CAR_MODELS.find(m => m.id === id)?.name ?? id;
@@ -172,9 +173,7 @@ function customerLeaves(w: World, j: JobRow) {
   const angry = j.status === 'accepted';
   j.status = 'left'; touchJob(w, j);
   repDelta(w, angry ? REP_LEFT * 3 : REP_LEFT);
-  feed(w, j.leave_at, 'bad', angry
-    ? `${j.customer} не дождался ремонта и уехал. Обещал рассказать знакомым.`
-    : `${j.customer} устал ждать и уехал в другой сервис.`);
+  feed(w, j.leave_at, 'bad', line(angry ? 'left_accepted' : 'left_waiting', rng(`left:${w.c.id}:${j.id}`), { name: j.customer }));
 }
 
 function completeJob(w: World, j: JobRow) {
@@ -193,7 +192,7 @@ function completeJob(w: World, j: JobRow) {
   const r = rng(`quality:${w.c.id}:${j.id}`);
   if (r.chance(pFail)) j.complaint_at = at + r.int(2, 10) * 3600_000;
   else repDelta(w, REP_GOOD);
-  feed(w, at, 'money', `${modelName(j.car.model)} готова. ${j.customer} заплатил ${fmt(j.labor + j.parts_price)}.`);
+  feed(w, at, 'money', line('done', rng(`done:${w.c.id}:${j.id}`), { name: j.customer, car: modelName(j.car.model), sum: fmt(j.labor + j.parts_price) }));
 }
 
 function complaint(w: World, j: JobRow) {
@@ -202,7 +201,7 @@ function complaint(w: World, j: JobRow) {
   const cost = jobParts(j).reduce((s, [part, qty]) => s + partPrice(part, 'orig') * SUPPLIER.corner.priceK * qty, 0);
   money(w, j.complaint_at, -cost, 'warranty', j.id);
   repDelta(w, REP_COMPLAINT);
-  feed(w, j.complaint_at, 'bad', `${j.customer} вернулся с претензией по ${modelName(j.car.model)}. Переделали по гарантии за ${fmt(cost)}.`);
+  feed(w, j.complaint_at, 'bad', line('complaint', rng(`complaint:${w.c.id}:${j.id}`), { name: j.customer, car: modelName(j.car.model), sum: fmt(cost) }));
 }
 
 function deliver(w: World, p: PoRow) {
@@ -218,8 +217,9 @@ function deliver(w: World, p: PoRow) {
     refund += bad * l.unit; defects += bad;
   }
   if (refund) money(w, p.eta, refund, 'supplier_refund', p.id);
-  const late = p.eta > p.eta_promised ? `, опоздание ${Math.round((p.eta - p.eta_promised) / 60_000)} мин` : '';
-  feed(w, p.eta, defects ? 'bad' : 'info', `Поставка от «${s.name}» на месте${late}.` + (defects ? ` Брак: ${defects} шт., вернули ${fmt(refund)}.` : ''));
+  if (p.eta > p.eta_promised) feed(w, p.eta, 'bad', line('late', r, { supplier: s.name, mins: Math.round((p.eta - p.eta_promised) / 60_000) }));
+  else feed(w, p.eta, 'info', `Поставка от «${s.name}» на месте.`);
+  if (defects) feed(w, p.eta, 'bad', line('defect', r, { n: defects, sum: fmt(refund) }));
 }
 
 function addStock(w: World, part: string, grade: Grade, qty: number, unit: number) {
@@ -306,10 +306,10 @@ export function cmdQuote(w: World, now: number, jobId: unknown, typesRaw: unknow
   j.price_level = level; j.grade = grade; j.labor = q.labor; j.parts_price = q.parts;
   if (ok) {
     j.job_types = types; j.status = 'accepted'; j.leave_at = Math.max(j.leave_at, now + 3 * 3600_000);
-    feed(w, now, 'info', `${j.customer} согласен на ${fmt(q.labor + q.parts)} и готов подождать до 3 часов.`);
+    feed(w, now, 'info', line('accepted', rng(`acc:${w.c.id}:${j.id}`), { name: j.customer, sum: fmt(q.labor + q.parts) }) + ' Ждёт до 3 часов.');
   } else {
     j.status = 'left'; j.leave_at = now;
-    feed(w, now, 'bad', `${j.customer}: «${fmt(q.labor + q.parts)}? Нет, спасибо». Уехал.`);
+    feed(w, now, 'bad', line('declined', rng(`dec:${w.c.id}:${j.id}`), { name: j.customer, sum: fmt(q.labor + q.parts) }));
   }
   touchJob(w, j);
   return { accepted: ok };
@@ -349,7 +349,7 @@ export function cmdStart(w: World, now: number, jobId: unknown) {
   for (const id of jobTools(j.job_types)) {
     const t = w.tools.get(id)!;
     t.wear = Math.min(1, Math.round((t.wear + 1 / TOOL[id].durability) * 10000) / 10000);
-    if (t.wear >= 1) { t.broken = 1; feed(w, now, 'bad', `${TOOL[id].name} не выдержал. Нужен ремонт.`); }
+    if (t.wear >= 1) { t.broken = 1; feed(w, now, 'bad', line('tool_broke', rng(`broke:${w.c.id}:${j.id}:${id}`), { tool: TOOL[id].name }) + ' Нужен ремонт.'); }
     w.dirty.tools.add(id);
   }
   j.parts_cost = cost; j.status = 'in_progress'; j.started_at = now;
