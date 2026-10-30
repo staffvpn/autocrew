@@ -33,5 +33,6 @@ export async function signInitData(user: TgUser, botToken: string, authDate = Ma
   return params.toString();
 }
 
-export const adminIds = (env: { ADMIN_IDS?: string }) =>
-  String(env.ADMIN_IDS || '').split(/[,\s]+/).map(Number).filter(n => Number.isInteger(n) && n > 0);
+// Админы: секрет ADMIN_IDS плюс открытый список ADMINS из wrangler.toml (Telegram ID не секрет).
+export const adminIds = (env: { ADMIN_IDS?: string; ADMINS?: string }) =>
+  `${env.ADMIN_IDS || ''},${env.ADMINS || ''}`.split(/[,\s]+/).map(Number).filter(n => Number.isInteger(n) && n > 0);

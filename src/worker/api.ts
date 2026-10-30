@@ -13,6 +13,7 @@ export interface Env {
   BOT_TOKEN: string;
   WEBHOOK_SECRET?: string;
   ADMIN_IDS?: string;
+  ADMINS?: string;
   CHANNEL_ID?: string;
   CHANNEL_USERNAME?: string;
   APP_URL?: string;

@@ -13,6 +13,8 @@ database_id = "a76ae3e1-8996-4f16-8549-01ea1fa84e44"
 migrations_dir = "migrations"
 
 [vars]
+# Админы бота (дополнительно к секрету ADMIN_IDS), через запятую
+ADMINS = "432943377"
 CHANNEL_ID = "@autocrewgame"
 CHANNEL_USERNAME = "autocrewgame"
 

@@ -158,3 +158,12 @@ describe('ограничения', () => {
     expect(() => G.cmdOrderParts(w, T0, 'corner', [{ part_id: 'gold', grade: 'orig', qty: 1 }], 'po1')).toThrow();
   });
 });
+
+describe('админы', async () => {
+  const { adminIds } = await import('../src/worker/auth');
+  it('объединяет секрет и открытый список', () => {
+    expect(adminIds({ ADMIN_IDS: '111, 222', ADMINS: '432943377' })).toEqual([111, 222, 432943377]);
+    expect(adminIds({ ADMINS: '432943377' })).toEqual([432943377]);
+    expect(adminIds({})).toEqual([]);
+  });
+});
