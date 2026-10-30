@@ -3,6 +3,7 @@ import { STAGES, TOOLS, TOOL, JOB, PART, PARTS, SUPPLIERS, SUPPLIER, ADS, PRICE_
 import { BUILD } from '../shared/build';
 import { mskHour } from '../shared/time';
 import { LINES, voice } from '../shared/lines';
+import { weatherAt, WEATHER_NAMES } from '../shared/weather';
 import { draw, W, H } from './scene';
 
 declare global { interface Window { Telegram?: { WebApp: any } } }
@@ -159,11 +160,11 @@ function render() {
   if (!S) { renderStart(app); return; }
   const c = S.company;
   if (!$('.top', app)) {
-    app.innerHTML = `<div class="top"></div><div class="scene"><canvas width="${W}" height="${H}"></canvas><div class="sign"></div><div class="clock"></div><div class="bubble" hidden></div></div><main></main><nav class="tabs"></nav>`;
+    app.innerHTML = `<div class="top"></div><div class="scene"><div class="stage"><canvas width="${W}" height="${H}"></canvas><div class="clock"></div><div class="bubble" hidden></div></div></div><main></main><nav class="tabs"></nav>`;
     canvas = $('canvas', app) as HTMLCanvasElement;
     $('nav.tabs', app).onclick = e => {
       const b = (e.target as HTMLElement).closest('button') as HTMLElement | null;
-      if (b?.dataset.tab) { tab = b.dataset.tab; localStorage.setItem('ac_tab', tab); render(); window.scrollTo({ top: 0 }); }
+      if (b?.dataset.tab) { tab = b.dataset.tab; setPref('ac_tab', tab); render(); $('main').scrollTop = 0; }
     };
     $('main', app).addEventListener('click', onMainClick);
     $('main', app).addEventListener('change', onMainChange);
@@ -171,7 +172,6 @@ function render() {
   $('.top', app).innerHTML = `<div class="name">${esc(c.name)}<small>${esc(S.stageInfo.cur.name)}</small></div>
     <div class="stat"><b class="${c.cash < 0 ? 'neg' : ''}">${rub(c.cash)}</b><span>касса</span></div>
     <div class="stat"><b>${Math.floor(c.reputation)}</b><span>репутация</span></div>`;
-  $('.sign', app).textContent = c.name;
   const waiting = S.jobs.filter((j: Any) => j.status !== 'in_progress').length;
   $('nav.tabs', app).innerHTML = TABS.map(([id, name]) => `<button data-tab="${id}" class="${tab === id ? 'on' : ''}"><svg viewBox="0 0 24 24">${ICONS[id]}</svg>${name}${id === 'yard' && waiting ? `<span class="dot">${waiting}</span>` : ''}</button>`).join('');
   const main = $('main', app);
@@ -311,7 +311,7 @@ function stockTab() {
     <div class="seg" style="margin-bottom:8px">${(Object.keys(GRADES) as Grade[]).map(g => `<button data-sgrade="${g}" class="${shopGrade === g ? 'on' : ''}">${GRADES[g].name}</button>`).join('')}</div>
     <p class="small muted" style="margin:0 2px 8px">Платформы: отеч. — Ладья и Нава, кор. — Хёнда, Кия, Дэу, евр. — Рэно, Фольцваген, Шкадо, Форт, яп. — Тайота, Мицубуси.</p>
     ${shop}
-    <div class="card" style="position:sticky;bottom:calc(64px + env(safe-area-inset-bottom))"><div class="row between"><span>В корзине ${[...cart.values()].reduce((a, b) => a + b, 0)} шт.${sup.minOrder ? ` <span class="small muted">мин. ${rub(sup.minOrder)}</span>` : ''}</span><span class="price">${rub(total + (cart.size ? sup.fee : 0))}</span></div>
+    <div class="card" style="${cart.size ? 'position:sticky;bottom:0;box-shadow:0 -8px 16px rgba(0,0,0,.35)' : ''}"><div class="row between"><span>В корзине ${[...cart.values()].reduce((a, b) => a + b, 0)} шт.${sup.minOrder ? ` <span class="small muted">мин. ${rub(sup.minOrder)}</span>` : ''}</span><span class="price">${rub(total + (cart.size ? sup.fee : 0))}</span></div>
       <div class="row" style="margin-top:8px"><button class="btn primary" data-order ${!cart.size || total < sup.minOrder ? 'disabled' : ''}>Заказать</button><button class="btn sm" data-clear style="margin-left:auto" ${cart.size ? '' : 'disabled'}>Очистить</button></div></div>`;
 }
 const unit = (sup: string, part: string, grade: Grade) => Math.round(Math.round(PART[part].retail * GRADES[grade].priceK) * SUPPLIER[sup].priceK);
@@ -433,16 +433,18 @@ function onMainChange(e: Event) {
 
 // ---------- Анимация и таймеры ----------
 let lastDone = 0;
+const SHIRTS = ['#7a3b2e', '#3e5c3a', '#5a4a7a', '#8a6a2a', '#2e5a6a', '#6a2e4a'];
 function frame(ts: number) {
   if (canvas && S) {
     const ctx = canvas.getContext('2d')!;
     const w = S.jobs.find((j: Any) => j.status === 'in_progress');
+    const msk = new Date(now() + 3 * 3600_000);
     draw(ctx, {
-      stage: S.company.stage, hour: mskHour(now()), tools: S.tools.filter((t: Any) => !t.broken).map((t: Any) => t.tool_id),
+      stage: S.company.stage, hour: msk.getUTCHours(), minute: msk.getUTCMinutes(), weather: weatherAt(now()), tools: S.tools.filter((t: Any) => !t.broken).map((t: Any) => t.tool_id),
       working: w ? { color: w.car.color, progress: Math.min(1, (now() - w.started_at) / (w.done_at - w.started_at)), lifted: w.job_types.some((t: string) => ['brake_pads', 'stab_links'].includes(t)) } : null,
-      queue: S.jobs.filter((j: Any) => j.status !== 'in_progress').map((j: Any) => ({ color: j.car.color, flag: !j.inspected })),
+      queue: S.jobs.filter((j: Any) => j.status !== 'in_progress').map((j: Any) => ({ shirt: SHIRTS[j.customer.length % SHIRTS.length], flag: !j.inspected })),
     }, ts);
-    const ck = $('.scene .clock'); if (ck) ck.textContent = clock(now());
+    const ck = $('.scene .clock'); if (ck) ck.textContent = `${clock(now())} · ${WEATHER_NAMES[weatherAt(now())]}`;
     if (w) {
       const bar = document.querySelector(`[data-progress="${w.id}"]`) as HTMLElement | null;
       if (bar) bar.style.width = Math.min(100, ((now() - w.started_at) / (w.done_at - w.started_at)) * 100) + '%';
@@ -465,7 +467,11 @@ function frame(ts: number) {
 // ---------- Запуск ----------
 if (tg) {
   tg.ready(); tg.expand();
-  try { tg.setHeaderColor('#111215'); tg.setBackgroundColor('#111215'); tg.disableVerticalSwipes?.(); } catch { /* старые клиенты */ }
+  try { tg.setHeaderColor('#111215'); tg.setBackgroundColor('#111215'); tg.setBottomBarColor?.('#111215'); tg.disableVerticalSwipes?.(); } catch { /* старые клиенты */ }
+  // Полноэкранный режим на телефонах (Telegram 8.0+). На компьютере остаёмся в окне.
+  if (['ios', 'android', 'android_x'].includes(tg.platform) && tg.isVersionAtLeast?.('8.0')) {
+    try { tg.requestFullscreen(); tg.lockOrientation?.(); } catch { /* клиент не поддерживает */ }
+  }
 }
 render();
 if (initData) refresh();
