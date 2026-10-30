@@ -1,10 +1,10 @@
 // Клиент AUTO CREW. Только показывает состояние с сервера и отправляет команды.
-import { STAGES, TOOLS, TOOL, JOB, PART, PARTS, SUPPLIERS, SUPPLIER, ADS, PRICE_LEVELS, GRADES, PLATFORM_NAMES, NH_SECONDS, type Grade } from '../shared/content';
+import { STAGES, TOOLS, TOOL, JOB, PART, PARTS, SUPPLIERS, SUPPLIER, ADS, PRICE_LEVELS, GRADES, PLATFORM_NAMES, NH_SECONDS, CAR_MODELS, type Grade, type Body } from '../shared/content';
 import { BUILD } from '../shared/build';
 import { mskHour } from '../shared/time';
 import { LINES, voice } from '../shared/lines';
 import { weatherAt, WEATHER_NAMES } from '../shared/weather';
-import { draw, W, H } from './scene';
+import { draw, W, H, type Pose } from './scene';
 
 declare global { interface Window { Telegram?: { WebApp: any } } }
 const tg = window.Telegram?.WebApp;
@@ -433,7 +433,9 @@ function onMainChange(e: Event) {
 
 // ---------- Анимация и таймеры ----------
 let lastDone = 0;
-const SHIRTS = ['#7a3b2e', '#3e5c3a', '#5a4a7a', '#8a6a2a', '#2e5a6a', '#6a2e4a'];
+const SHIRTS = ['#8a2a22', '#2e4a2e', '#3a3a6a', '#8a6a2a', '#2a4a5a', '#5a2a3a', '#4a4e56', '#6a4a2a'];
+// Поза механика по работе: масло сливают снизу, тормоза и подвеска — у снятого колеса, остальное — под капотом
+const poseFor = (types: string[]): Pose => types.includes('brake_pads') || types.includes('stab_links') ? 'wheel' : types.includes('oil_change') ? 'under' : 'hood';
 function frame(ts: number) {
   if (canvas && S) {
     const ctx = canvas.getContext('2d')!;
@@ -441,8 +443,8 @@ function frame(ts: number) {
     const msk = new Date(now() + 3 * 3600_000);
     draw(ctx, {
       stage: S.company.stage, hour: msk.getUTCHours(), minute: msk.getUTCMinutes(), weather: weatherAt(now()), tools: S.tools.filter((t: Any) => !t.broken).map((t: Any) => t.tool_id),
-      working: w ? { color: w.car.color, progress: Math.min(1, (now() - w.started_at) / (w.done_at - w.started_at)), lifted: w.job_types.some((t: string) => ['brake_pads', 'stab_links'].includes(t)) } : null,
-      queue: S.jobs.filter((j: Any) => j.status !== 'in_progress').map((j: Any) => ({ shirt: SHIRTS[j.customer.length % SHIRTS.length], flag: !j.inspected })),
+      working: w ? { color: w.car.color, progress: Math.min(1, (now() - w.started_at) / (w.done_at - w.started_at)), body: (CAR_MODELS.find(m => m.id === w.car.model)?.body || 'sedan') as Body, old: w.car.year < 2010, pose: poseFor(w.job_types), seed: w.arrived_at % 100000 } : null,
+      queue: S.jobs.filter((j: Any) => j.status !== 'in_progress').map((j: Any) => ({ shirt: SHIRTS[(j.customer.length + j.arrived_at / 900000) % SHIRTS.length], cap: (j.arrived_at / 900000) % 3 === 0, flag: !j.inspected })),
     }, ts);
     const ck = $('.scene .clock'); if (ck) ck.textContent = `${clock(now())} · ${WEATHER_NAMES[weatherAt(now())]}`;
     if (w) {

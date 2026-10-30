@@ -21,21 +21,22 @@ export const GRADES: Record<Grade, { name: string; priceK: number }> = {
 };
 
 // Модели машин клиентов. Названия похожи на настоящие, но не совпадают с ними.
-export interface CarModel { id: string; name: string; platform: Platform; years: [number, number]; weight: number }
+export type Body = 'classic' | 'sedan' | 'hatch' | 'suv';
+export interface CarModel { id: string; name: string; platform: Platform; body: Body; years: [number, number]; weight: number }
 export const CAR_MODELS: CarModel[] = [
-  { id: 'ladya_2107', name: 'Ладья 2107', platform: 'vaz', years: [1995, 2012], weight: 5 },
-  { id: 'ladya_privora', name: 'Ладья Привора', platform: 'vaz', years: [2008, 2018], weight: 5 },
-  { id: 'ladya_granda', name: 'Ладья Гранда', platform: 'vaz', years: [2012, 2024], weight: 7 },
-  { id: 'shevrale_nava', name: 'Шеврале Нава', platform: 'vaz', years: [2003, 2020], weight: 3 },
-  { id: 'hyonda_solarus', name: 'Хёнда Соларус', platform: 'kor', years: [2011, 2022], weight: 7 },
-  { id: 'kiya_riya', name: 'Кия Рия', platform: 'kor', years: [2011, 2023], weight: 6 },
-  { id: 'deu_nexa', name: 'Дэу Нэкса', platform: 'kor', years: [2002, 2016], weight: 3 },
-  { id: 'reno_logun', name: 'Рэно Логун', platform: 'eu', years: [2006, 2021], weight: 5 },
-  { id: 'folcvagen_pola', name: 'Фольцваген Пола', platform: 'eu', years: [2010, 2020], weight: 5 },
-  { id: 'shkado_oktavia', name: 'Шкадо Октавиа', platform: 'eu', years: [2008, 2022], weight: 4 },
-  { id: 'fort_fokus', name: 'Форт Фокус', platform: 'eu', years: [2005, 2018], weight: 4 },
-  { id: 'taiota_koralla', name: 'Тайота Коралла', platform: 'jp', years: [2006, 2021], weight: 4 },
-  { id: 'micubusi_lansor', name: 'Мицубуси Лансор', platform: 'jp', years: [2007, 2016], weight: 2 },
+  { id: 'ladya_2107', name: 'Ладья 2107', platform: 'vaz', body: 'classic', years: [1995, 2012], weight: 5 },
+  { id: 'ladya_privora', name: 'Ладья Привора', platform: 'vaz', body: 'sedan', years: [2008, 2018], weight: 5 },
+  { id: 'ladya_granda', name: 'Ладья Гранда', platform: 'vaz', body: 'sedan', years: [2012, 2024], weight: 7 },
+  { id: 'shevrale_nava', name: 'Шеврале Нава', platform: 'vaz', body: 'suv', years: [2003, 2020], weight: 3 },
+  { id: 'hyonda_solarus', name: 'Хёнда Соларус', platform: 'kor', body: 'sedan', years: [2011, 2022], weight: 7 },
+  { id: 'kiya_riya', name: 'Кия Рия', platform: 'kor', body: 'hatch', years: [2011, 2023], weight: 6 },
+  { id: 'deu_nexa', name: 'Дэу Нэкса', platform: 'kor', body: 'sedan', years: [2002, 2016], weight: 3 },
+  { id: 'reno_logun', name: 'Рэно Логун', platform: 'eu', body: 'sedan', years: [2006, 2021], weight: 5 },
+  { id: 'folcvagen_pola', name: 'Фольцваген Пола', platform: 'eu', body: 'hatch', years: [2010, 2020], weight: 5 },
+  { id: 'shkado_oktavia', name: 'Шкадо Октавиа', platform: 'eu', body: 'sedan', years: [2008, 2022], weight: 4 },
+  { id: 'fort_fokus', name: 'Форт Фокус', platform: 'eu', body: 'hatch', years: [2005, 2018], weight: 4 },
+  { id: 'taiota_koralla', name: 'Тайота Коралла', platform: 'jp', body: 'sedan', years: [2006, 2021], weight: 4 },
+  { id: 'micubusi_lansor', name: 'Мицубуси Лансор', platform: 'jp', body: 'sedan', years: [2007, 2016], weight: 2 },
 ];
 export const CAR_COLORS = ['#b8b8b0', '#2b2f36', '#8a1f1f', '#1f3f6e', '#e0ddd2', '#3d5a3a', '#6b5a3e', '#9c7a2c'];
 
