@@ -95,7 +95,9 @@ async function checkRelease() {
 }
 function renderUpdate() {
   document.querySelector('.update')?.remove();
-  if (!release || release.build.id === BUILD.id || BUILD.id === 'dev' || dismissedBuild === release.build.id) return;
+  // Баннер — только для новой версии из списка изменений. Технические сборки той же версии
+  // подхватываются тихо при возвращении в игру (см. silentUpdate).
+  if (!release || release.version === BUILD.version || BUILD.id === 'dev' || dismissedBuild === release.build.id) return;
   const el = document.createElement('div');
   el.className = 'update';
   el.innerHTML = `<h3>Вышло обновление AUTO CREW</h3>
@@ -468,7 +470,15 @@ if (tg) {
 render();
 if (initData) refresh();
 setInterval(() => { if (initData && document.visibilityState === 'visible') refresh(); }, 20_000);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && initData) { refresh(); checkRelease(); } });
+// Тихое обновление: та же версия, другая сборка. Перезагружаемся только при возвращении
+// в игру и только если нет команд в пути — состояние всё равно на сервере.
+function silentUpdate() {
+  if (release && release.version === BUILD.version && release.build.id !== BUILD.id && BUILD.id !== 'dev' && pending === 0) location.reload();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') checkRelease();
+  if (document.visibilityState === 'visible') { silentUpdate(); if (initData) { refresh(); checkRelease(); } }
+});
 setInterval(checkRelease, 120_000);
 checkRelease();
 requestAnimationFrame(frame);
