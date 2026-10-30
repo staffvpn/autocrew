@@ -1,0 +1,6 @@
+# Скопируйте в .dev.vars для локального запуска. Файл .dev.vars в git не попадает.
+BOT_TOKEN=000000:dev-token
+WEBHOOK_SECRET=dev-secret
+ADMIN_IDS=
+# Только для локальной разработки: вход без Telegram через /api/dev-login
+DEV_AUTH=1

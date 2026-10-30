@@ -1,0 +1,25 @@
+{
+  "name": "autocrew",
+  "version": "1.0.0",
+  "description": "AUTO CREW — автомобильный бизнес-симулятор в Telegram Mini App",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "node tools/gen-build.mjs && vite build",
+    "dev": "node tools/gen-build.mjs && vite build && wrangler d1 migrations apply autocrew --local && wrangler dev",
+    "check": "tsc -p .",
+    "test": "vitest run",
+    "deploy": "npm run build && wrangler d1 migrations apply autocrew --remote && wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261030.1",
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.5",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.156.0"
+  },
+  "private": true,
+  "type": "module"
+}

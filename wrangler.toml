@@ -1,0 +1,20 @@
+name = "autocrew"
+main = "src/worker/index.ts"
+compatibility_date = "2026-10-01"
+
+[assets]
+directory = "dist"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "autocrew"
+database_id = "a76ae3e1-8996-4f16-8549-01ea1fa84e44"
+migrations_dir = "migrations"
+
+[vars]
+CHANNEL_ID = "@autocrewgame"
+CHANNEL_USERNAME = "autocrewgame"
+
+[observability]
+enabled = true

@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run check
+      - run: npx tsc -p src/client/tsconfig.json
+      - run: npm test
+      - run: npm run build
+
+  # Деплой только из main и только когда в репозитории заданы секреты Cloudflare.
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - name: Проверка секретов
+        id: guard
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "Секреты Cloudflare не заданы, деплой пропущен"; echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skip != '1'
+        run: npm ci
+      - name: База D1 (создаётся один раз)
+        if: steps.guard.outputs.skip != '1'
+        run: |
+          ID=$(npx wrangler d1 list --json | node -e 'const l=JSON.parse(require("fs").readFileSync(0));const d=l.find(x=>x.name==="autocrew");if(d)console.log(d.uuid)')
+          if [ -z "$ID" ]; then
+            npx wrangler d1 create autocrew
+            ID=$(npx wrangler d1 list --json | node -e 'const l=JSON.parse(require("fs").readFileSync(0));console.log(l.find(x=>x.name==="autocrew").uuid)')
+          fi
+          sed -i "s/^database_id = .*/database_id = \"$ID\"/" wrangler.toml
+      - name: Резервная копия базы перед миграциями
+        if: steps.guard.outputs.skip != '1'
+        run: npx wrangler d1 export autocrew --remote --output=backup.sql || echo "первый деплой: копировать нечего"
+      - uses: actions/upload-artifact@v4
+        if: steps.guard.outputs.skip != '1'
+        with: { name: d1-backup-${{ github.sha }}, path: backup.sql, if-no-files-found: ignore, retention-days: 30 }
+      - name: Миграции
+        if: steps.guard.outputs.skip != '1'
+        run: npx wrangler d1 migrations apply autocrew --remote
+      - name: Сборка и деплой
+        id: deploy
+        if: steps.guard.outputs.skip != '1'
+        run: |
+          npm run build
+          npx wrangler deploy | tee deploy.log
+          echo "url=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | head -1)" >> "$GITHUB_OUTPUT"
+      - name: Секреты воркера
+        if: steps.guard.outputs.skip != '1'
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          ADMIN_IDS: ${{ secrets.ADMIN_IDS }}
+        run: |
+          for k in BOT_TOKEN WEBHOOK_SECRET ADMIN_IDS; do
+            v="${!k}"; if [ -n "$v" ]; then printf '%s' "$v" | npx wrangler secret put "$k"; fi
+          done
+      - name: Вебхук и кнопка бота
+        if: steps.guard.outputs.skip != '1' && steps.deploy.outputs.url != ''
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          if [ -z "$WEBHOOK_SECRET" ]; then echo "WEBHOOK_SECRET не задан"; exit 0; fi
+          sleep 5
+          curl -fsS "${{ steps.deploy.outputs.url }}/tg/setup?key=$WEBHOOK_SECRET" | head -c 300; echo
+          echo "Игра: ${{ steps.deploy.outputs.url }}"
