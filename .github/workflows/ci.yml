@@ -53,10 +53,15 @@ jobs:
           sed -i "s/^database_id = .*/database_id = \"$ID\"/" wrangler.toml
       - name: Резервная копия базы перед миграциями
         if: steps.guard.outputs.skip != '1'
-        run: npx wrangler d1 export autocrew --remote --output=backup.sql || echo "первый деплой: копировать нечего"
+        run: |
+          npx wrangler d1 export autocrew --remote --output=backup.sql || echo "первый деплой, копировать нечего"
       - uses: actions/upload-artifact@v4
         if: steps.guard.outputs.skip != '1'
-        with: { name: d1-backup-${{ github.sha }}, path: backup.sql, if-no-files-found: ignore, retention-days: 30 }
+        with:
+          name: d1-backup-${{ github.sha }}
+          path: backup.sql
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Миграции
         if: steps.guard.outputs.skip != '1'
         run: npx wrangler d1 migrations apply autocrew --remote
